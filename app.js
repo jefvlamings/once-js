@@ -4,10 +4,9 @@ var favicon = require('serve-favicon');
 var logger = require('morgan');
 var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
-var exphbs  = require('express3-handlebars');
+var exphbs  = require('express-handlebars');
 var routes = require('./routes/index');
 var users = require('./routes/users');
-var Pusher = require( 'pusher' );
 
 var app = express();
 
@@ -23,23 +22,6 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
-
-// Pusher
-var pusher = new Pusher({ 
-	appId: '88652', 
-	key: '42e2e3f640922831c34d', 
-	secret: '5a58d27cae3a3bb84031' 
-});
-app.post('/pusher/auth', function( req, res ) {
-  var socketId = req.body.socket_id;
-  var channel = req.body.channel_name;
-  var auth = pusher.authenticate( socketId, channel );
-  res.send( auth );
-});
-app.post('/trigger', function( req, res ) {
-	pusher.trigger('private-mousemoves', 'client-mouse-moved', req.body);
-	res.send(200);
-});
 
 app.use('/', routes);
 app.use('/users', users);
