@@ -28,7 +28,8 @@ var Native = function() {
 	/**
 	 * Holds the socket connection
 	 */
-	self.socket = io('ws://localhost:80');
+//	self.socket = io('ws://localhost:6969');
+	self.socket = io('ws://192.168.0.226:6969');
 	
 	/**
 	 * Holds the canvas
@@ -139,7 +140,7 @@ var Native = function() {
 			self.sync();
 			timer = setInterval(function() {
 				self.sync();
-			}, 0)
+			}, 10);
 		});
 		
 		// Stop pushing when the mouse is no longer being clicked
