@@ -26,6 +26,14 @@ var Native = function() {
 	var self = this;
 	
 	/**
+	 * Config
+	 */
+	self.config = {
+		interval : 1,	
+		points : 40
+	};
+	
+	/**
 	 * Holds the socket connection
 	 */
 //	self.socket = io('ws://localhost:6969');
@@ -40,6 +48,11 @@ var Native = function() {
 	 * Holds the canvas context (2D)
 	 */
 	self.ctx;
+	
+	/**
+	 * Holds all the point that need to be drawn
+	 */
+	self.points = [];
 	
 	/**
 	 * Coordinates
@@ -87,7 +100,7 @@ var Native = function() {
 		// Get mouse coordinates
 		var mouseX = event.pageX;
 		var mouseY = event.pageY;
-		coordinates = {
+		self.coordinates = {
 			x: (mouseX - 8) - 1,
 			y: (mouseY - 8) - 1
 		};
@@ -97,25 +110,53 @@ var Native = function() {
 	/**
 	 * Pushes the mouse position to the server
 	 */
-	self.sync = function(event) {
-		var touch = new Touch();
-		touch.set('x', coordinates.x);
-		touch.set('y', coordinates.y);
-		self.socket.emit('mouse', touch.toJSON());
+	self.push = function() {
+		self.socket.emit('mouse', self.coordinates);
 	};	
+	
+	/**
+	 * Add a point the the points array
+	 */
+	self.addPoint = function(point) {
+		if(self.points.length > self.config.points) {
+			self.points.shift();
+		}
+		self.points.push(point);
+	};
 	
 	/**
 	 * Add a point to the canvas with the given coordinates
 	 */
-	self.addPointToCanvas = function(x,y) {
+	self.redraw = function() {
 		self.setGrid();
-		self.ctx.beginPath();
-		self.ctx.arc(x, y, 3, 0, 2 * Math.PI, true);
-		self.ctx.strokeStyle = '#333';
-		self.ctx.stroke();
-		self.ctx.font = "10px Arial";
-		self.ctx.fillText('(' + x + ',' + y + ')',x-20,y-10);
+		self.drawPoints();
 	};	
+	
+	/**
+	 * Add the points to the canvas
+	 */	
+	self.drawPoints = function() {
+		var dotSize = 4;
+		var hue = 300;
+		for(var i = 0; i< self.points.length; i++) {
+			
+			hue += (i/50 * (hue/self.config.points));
+			
+			var point = self.points[i];
+			self.ctx.beginPath();
+			var dotSizeNew = (dotSize - (i * (dotSize/self.config.points)));
+			self.ctx.arc(point.x, point.y, dotSizeNew, 0, 2 * Math.PI, true);
+			self.ctx.fillStyle = 'hsl(' + hue + ', ' + 255 + '%, 40%)';
+			self.ctx.fill();
+			
+			// Show coordinates
+//			if(i == (self.points.length -1)) {
+//				self.ctx.font = "10px Arial";
+//				self.ctx.fillText('(' + point.x + ',' + point.y + ')',point.x-20,point.y-10);
+//			}
+			
+		}
+	};
 	
 	/**
 	 * Acts as a constructor
@@ -131,22 +172,25 @@ var Native = function() {
 
 		// Listen to changes in the socket and draw the new position
 		self.socket.on('mouse', function(msg){
-			self.addPointToCanvas(msg.x, msg.y);
+			self.addPoint(msg);
+			self.redraw();
 		});	
 
 		// Start pushing coordinates to the server while the mouse is being clicked
 		document.addEventListener('mousedown', function(event) {
-			self.updateCoordinates(event);
-			self.sync();
 			timer = setInterval(function() {
-				self.sync();
-			}, 10);
+				self.push();
+			}, self.config.interval);
 		});
 		
 		// Stop pushing when the mouse is no longer being clicked
 		document.addEventListener('mouseup', function(event) {
 			window.clearInterval(timer);
 		});
+		
+		// Redraw canvas every 10 seconds
+		setInterval(function() {
+		}, self.config.interval);		
 		
 		// Update coordiantes while the mouse is moving
 		document.addEventListener('mousemove', function(event) {
