@@ -22,7 +22,8 @@ module.exports = function(grunt) {
 					'public/bower_components/backbone/backbone.js',
 					'public/bower_components/bootstrap/dist/js/bootstrap.js',
 					'public/javascripts/models/*.js',
-					'public/javascripts/*.js'
+					'public/javascripts/app.js',
+					'public/javascripts/thumbKiss.js'
 				],
 				dest: 'public/javascripts/build/final.js',
 			},
