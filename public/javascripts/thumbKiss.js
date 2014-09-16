@@ -31,7 +31,7 @@ var ThumbKiss = function(config) {
 	/**
 	 * Holds the canvas
 	 */
-	self.canvas;
+	self.$canvas = $('canvas');
 	
 	/**
 	 * Holds the canvas context (2D)
@@ -64,7 +64,6 @@ var ThumbKiss = function(config) {
 	 * Start
 	 */
 	self.start = function() {
-		window.clearInterval(self.drawInterval);
 		self.push();
 		self.pushInterval = setInterval(function() {
 			self.push();
@@ -77,8 +76,13 @@ var ThumbKiss = function(config) {
 	self.stop = function() {
 		window.clearInterval(self.pushInterval);
 		self.drawInterval = setInterval(function() {
-			self.points.shift();
-		}, self.config.interval);		
+			if(self.points.length === 0) {
+				window.clearInterval(self.drawInterval);
+			}
+			else {
+				self.points.shift();
+			}
+		}, self.config.interval);	
 	};
 	
 	/**
@@ -90,18 +94,18 @@ var ThumbKiss = function(config) {
 		self.ctx.lineWidth = 1;
 
 		// Vertical lines along the x-axis
-		for(var x = 10; x <= self.canvas.width; x = x+10) {
+		for(var x = 10; x <= self.$canvas[0].width; x = x+10) {
 			self.ctx.beginPath();
 			self.ctx.moveTo(x, 0);
-			self.ctx.lineTo(x, self.canvas.height);
+			self.ctx.lineTo(x, self.$canvas[0].height);
 			self.ctx.stroke();			
 		}
 
 		// Horizontal lines along the y-axis
-		for(var y = 10; y <= self.canvas.height; y = y+10) {
+		for(var y = 10; y <= self.$canvas[0].height; y = y+10) {
 			self.ctx.beginPath();
 			self.ctx.moveTo(0, y);
-			self.ctx.lineTo(self.canvas.width, y);
+			self.ctx.lineTo(self.$canvas[0].width, y);
 			self.ctx.stroke();			
 		}
 
@@ -113,11 +117,21 @@ var ThumbKiss = function(config) {
 	 * @param {object} event Mouse event
 	 */
 	self.updateCoordinates = function(event) {
-		var mouseX = event.pageX;
-		var mouseY = event.pageY;
 		self.coordinates = {
-			x: (mouseX - 8) - 1,
-			y: (mouseY - 8) - 1
+			x: (event.pageX / $(window).width()).toFixed(4),
+			y: (event.pageY / $(window).height()).toFixed(4)
+		};
+	};	
+	
+	/**
+	 * Get the coordinates of the click, within the canvas
+	 * 
+	 * @param {object} event Mouse event
+	 */
+	self.updateCoordinatesWithTouch = function(event) {
+		self.coordinates = {
+			x: (event.originalEvent.touches[0].pageX / $(window).width()).toFixed(4),
+			y: (event.originalEvent.touches[0].pageY / $(window).height()).toFixed(4)
 		};
 	};	
 	
@@ -194,21 +208,21 @@ var ThumbKiss = function(config) {
 			var point = self.points[i];
 
 			// Calculate dot size
-			var dotSizeNew = (self.config.dotSize - (i * (self.config.dotSize/self.config.points)));
-			if(dotSizeNew <= 0) {
-				dotSizeNew = 1;
-			}
+//			var dotSizeNew = (self.config.dotSize - (i * (self.config.dotSize/self.config.points)));
+//			if(dotSizeNew <= 0) {
+//				dotSizeNew = 1;
+//			}
 			
 			// Calculate color
 			hue += (i/50 * (hue/self.config.points));
 			var color = 'hsl(' + hue + ', ' + 255 + '%, 40%)';
 			
 			// Draw the point
-			self.drawPoint(point.x, point.y, dotSizeNew, color);
+			self.drawPoint(point.x * $(window).width(), point.y  * $(window).height(), self.config.dotSize, color);
 
 			// Show coordinates
 			if(i === (self.points.length -1)) {
-				self.drawCoordinates(point.x,point.y);
+				self.drawCoordinates(point.x * $(window).width(),point.y * $(window).height());
 			}
 			
 		}
@@ -220,9 +234,12 @@ var ThumbKiss = function(config) {
 	 */
 	self.prepareCanvas = function() {
 		
+		// Scale to 100% width and height
+		self.$canvas[0].width = $(window).width();
+		self.$canvas[0].height = $(window).height();
+		
 		// Fetch the canvas and its context
-		self.canvas = document.getElementById('native');
-		self.ctx = self.canvas.getContext('2d');
+		self.ctx = self.$canvas[0].getContext('2d');
 		
 		// Render everything slightly better
 		self.ctx.translate(0.5,0.5);			
@@ -240,7 +257,10 @@ var ThumbKiss = function(config) {
 		// Extend the given config with the default config
 		self.config = $.extend({},self.defaultConfig, config);
 		
-		// Prepare the canvas
+		// Resize canvas if window resizes
+		$('window').on('resize', function() {
+			self.prepareCanvas();
+		});
 		self.prepareCanvas();
 		
 		// Listen to changes in the socket and draw the new position
@@ -249,23 +269,29 @@ var ThumbKiss = function(config) {
 		});	
 
 		// Start pushing coordinates to the server while the mouse is being clicked
-		document.addEventListener('mousedown', function(event) {
+		self.$canvas.on('mousedown touchstart', function(event) {
+			event.preventDefault();
 			self.start();
 		});
 		
 		// Stop pushing when the mouse is no longer being clicked
-		document.addEventListener('mouseup', function(event) {
+		self.$canvas.on('mouseup touchend', function(event) {
+			event.preventDefault();
 			self.stop();
 		});
 		
-		// Redraw canvas every 10 seconds
+		// Redraw canvas every x milliseconds
 		setInterval(function() {
 			self.redrawCanvas();
 		}, self.config.interval);		
 		
 		// Update coordiantes while the mouse is moving
-		document.addEventListener('mousemove', function(event) {
-			if(event.which === 1) {
+		self.$canvas.on('mousemove touchmove', function(event) {			
+			event.preventDefault();
+			if(event.type === 'touchmove') {
+				self.updateCoordinatesWithTouch(event);
+			}
+			else if(event.which === 1) {
 				self.updateCoordinates(event);
 			}
 			else {

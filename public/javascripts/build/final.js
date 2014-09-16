@@ -12214,6 +12214,154 @@ return jQuery;
 
 }));
 
+/*! jquery.finger - v0.1.0 - 2014-02-19
+* https://github.com/ngryman/jquery.finger
+* Copyright (c) 2014 Nicolas Gryman; Licensed MIT */
+
+(function($, ua) {
+
+	var isChrome = /chrome/i.exec(ua),
+		isAndroid = /android/i.exec(ua),
+		hasTouch = 'ontouchstart' in window && !(isChrome && !isAndroid),
+		startEvent = hasTouch ? 'touchstart' : 'mousedown',
+		stopEvent = hasTouch ? 'touchend touchcancel' : 'mouseup mouseleave',
+		moveEvent = hasTouch ? 'touchmove' : 'mousemove',
+
+		namespace = 'finger',
+		rootEl = $('html')[0],
+
+		start = {},
+		move = {},
+		motion,
+		cancel,
+		safeguard,
+		timeout,
+		prevEl,
+		prevTime,
+
+		Finger = $.Finger = {
+			pressDuration: 300,
+			doubleTapInterval: 300,
+			flickDuration: 150,
+			motionThreshold: 5
+		};
+
+	function page(coord, event) {
+		return (hasTouch ? event.originalEvent.touches[0] : event)['page' + coord.toUpperCase()];
+	}
+
+	function trigger(event, evtName, remove) {
+		var fingerEvent = $.Event(evtName, move);
+		$.event.trigger(fingerEvent, { originalEvent: event }, event.target);
+
+		if (fingerEvent.isDefaultPrevented()) event.preventDefault();
+
+		if (remove) {
+			$.event.remove(rootEl, moveEvent + '.' + namespace, moveHandler);
+			$.event.remove(rootEl, stopEvent + '.' + namespace, stopHandler);
+		}
+	}
+
+	function startHandler(event) {
+		var timeStamp = event.timeStamp || +new Date();
+
+		if (safeguard == timeStamp) return;
+		safeguard = timeStamp;
+
+		// initializes data
+		start.x = move.x = page('x', event);
+		start.y = move.y = page('y', event);
+		start.time = timeStamp;
+		start.target = event.target;
+		move.orientation = null;
+		move.end = false;
+		motion = false;
+		cancel = false;
+		timeout = setTimeout(function() {
+			cancel = true;
+			trigger(event, 'press');
+		}, $.Finger.pressDuration);
+
+		$.event.add(rootEl, moveEvent + '.' + namespace, moveHandler);
+		$.event.add(rootEl, stopEvent + '.' + namespace, stopHandler);
+
+		// global prevent default
+		if (Finger.preventDefault) event.preventDefault();
+	}
+
+	function moveHandler(event) {
+		// motion data
+		move.x = page('x', event);
+		move.y = page('y', event);
+		move.dx = move.x - start.x;
+		move.dy = move.y - start.y;
+		move.adx = Math.abs(move.dx);
+		move.ady = Math.abs(move.dy);
+
+		// security
+		motion = move.adx > Finger.motionThreshold || move.ady > Finger.motionThreshold;
+		if (!motion) return;
+
+		// moves cancel press events
+		clearTimeout(timeout);
+
+		// orientation
+		if (!move.orientation) {
+			if (move.adx > move.ady) {
+				move.orientation = 'horizontal';
+				move.direction = move.dx > 0 ? +1 : -1;
+			}
+			else {
+				move.orientation = 'vertical';
+				move.direction = move.dy > 0 ? +1 : -1;
+			}
+		}
+
+		// for delegated events, the target may change over time
+		// this ensures we notify the right target and simulates the mouseleave behavior
+		if (event.target !== start.target) {
+			event.target = start.target;
+			stopHandler.call(this, $.Event(stopEvent + '.' + namespace, event));
+			return;
+		}
+
+		// fire drag event
+		trigger(event, 'drag');
+	}
+
+	function stopHandler(event) {
+		var timeStamp = event.timeStamp || +new Date(),
+			dt = timeStamp - start.time,
+			evtName;
+
+		// always clears press timeout
+		clearTimeout(timeout);
+
+		// ensures start target and end target are the same
+		if (event.target !== start.target) return;
+
+		// tap-like events
+		if (!motion && !cancel) {
+			var doubleTap = prevEl === event.target && timeStamp - prevTime < Finger.doubleTapInterval;
+			evtName = doubleTap ? 'doubletap' : 'tap';
+			prevEl = doubleTap ? null : start.target;
+			prevTime = timeStamp;
+		}
+		// motion events
+		else {
+			if (dt < Finger.flickDuration) trigger(event, 'flick');
+			move.end = true;
+			evtName = 'drag';
+		}
+
+		trigger(event, evtName, true);
+	}
+
+	// initial binding
+	$.event.add(rootEl, startEvent + '.' + namespace, startHandler);
+
+})(jQuery, navigator.userAgent);
+
 var Touch = Backbone.Model.extend({
 	
 	urlRoot: 'trigger',
@@ -12242,7 +12390,7 @@ CanvasRenderingContext2D.prototype.clear =
 $('document').ready(function() {
 	var thumbKiss = new ThumbKiss({
 		interval : 1,	
-		points : 50,
+		points : 40,
 		hue: 300,
 		dotSize: 4
 	});
@@ -12280,7 +12428,7 @@ var ThumbKiss = function(config) {
 	/**
 	 * Holds the canvas
 	 */
-	self.canvas;
+	self.$canvas = $('canvas');
 	
 	/**
 	 * Holds the canvas context (2D)
@@ -12313,7 +12461,6 @@ var ThumbKiss = function(config) {
 	 * Start
 	 */
 	self.start = function() {
-		window.clearInterval(self.drawInterval);
 		self.push();
 		self.pushInterval = setInterval(function() {
 			self.push();
@@ -12326,8 +12473,13 @@ var ThumbKiss = function(config) {
 	self.stop = function() {
 		window.clearInterval(self.pushInterval);
 		self.drawInterval = setInterval(function() {
-			self.points.shift();
-		}, self.config.interval);		
+			if(self.points.length === 0) {
+				window.clearInterval(self.drawInterval);
+			}
+			else {
+				self.points.shift();
+			}
+		}, self.config.interval);	
 	};
 	
 	/**
@@ -12339,18 +12491,18 @@ var ThumbKiss = function(config) {
 		self.ctx.lineWidth = 1;
 
 		// Vertical lines along the x-axis
-		for(var x = 10; x <= self.canvas.width; x = x+10) {
+		for(var x = 10; x <= self.$canvas[0].width; x = x+10) {
 			self.ctx.beginPath();
 			self.ctx.moveTo(x, 0);
-			self.ctx.lineTo(x, self.canvas.height);
+			self.ctx.lineTo(x, self.$canvas[0].height);
 			self.ctx.stroke();			
 		}
 
 		// Horizontal lines along the y-axis
-		for(var y = 10; y <= self.canvas.height; y = y+10) {
+		for(var y = 10; y <= self.$canvas[0].height; y = y+10) {
 			self.ctx.beginPath();
 			self.ctx.moveTo(0, y);
-			self.ctx.lineTo(self.canvas.width, y);
+			self.ctx.lineTo(self.$canvas[0].width, y);
 			self.ctx.stroke();			
 		}
 
@@ -12362,11 +12514,21 @@ var ThumbKiss = function(config) {
 	 * @param {object} event Mouse event
 	 */
 	self.updateCoordinates = function(event) {
-		var mouseX = event.pageX;
-		var mouseY = event.pageY;
 		self.coordinates = {
-			x: (mouseX - 8) - 1,
-			y: (mouseY - 8) - 1
+			x: (event.pageX / $(window).width()).toFixed(4),
+			y: (event.pageY / $(window).height()).toFixed(4)
+		};
+	};	
+	
+	/**
+	 * Get the coordinates of the click, within the canvas
+	 * 
+	 * @param {object} event Mouse event
+	 */
+	self.updateCoordinatesWithTouch = function(event) {
+		self.coordinates = {
+			x: (event.originalEvent.touches[0].pageX / $(window).width()).toFixed(4),
+			y: (event.originalEvent.touches[0].pageY / $(window).height()).toFixed(4)
 		};
 	};	
 	
@@ -12443,21 +12605,21 @@ var ThumbKiss = function(config) {
 			var point = self.points[i];
 
 			// Calculate dot size
-			var dotSizeNew = (self.config.dotSize - (i * (self.config.dotSize/self.config.points)));
-			if(dotSizeNew <= 0) {
-				dotSizeNew = 1;
-			}
+//			var dotSizeNew = (self.config.dotSize - (i * (self.config.dotSize/self.config.points)));
+//			if(dotSizeNew <= 0) {
+//				dotSizeNew = 1;
+//			}
 			
 			// Calculate color
 			hue += (i/50 * (hue/self.config.points));
 			var color = 'hsl(' + hue + ', ' + 255 + '%, 40%)';
 			
 			// Draw the point
-			self.drawPoint(point.x, point.y, dotSizeNew, color);
+			self.drawPoint(point.x * $(window).width(), point.y  * $(window).height(), self.config.dotSize, color);
 
 			// Show coordinates
 			if(i === (self.points.length -1)) {
-				self.drawCoordinates(point.x,point.y);
+				self.drawCoordinates(point.x * $(window).width(),point.y * $(window).height());
 			}
 			
 		}
@@ -12469,9 +12631,12 @@ var ThumbKiss = function(config) {
 	 */
 	self.prepareCanvas = function() {
 		
+		// Scale to 100% width and height
+		self.$canvas[0].width = $(window).width();
+		self.$canvas[0].height = $(window).height();
+		
 		// Fetch the canvas and its context
-		self.canvas = document.getElementById('native');
-		self.ctx = self.canvas.getContext('2d');
+		self.ctx = self.$canvas[0].getContext('2d');
 		
 		// Render everything slightly better
 		self.ctx.translate(0.5,0.5);			
@@ -12489,7 +12654,10 @@ var ThumbKiss = function(config) {
 		// Extend the given config with the default config
 		self.config = $.extend({},self.defaultConfig, config);
 		
-		// Prepare the canvas
+		// Resize canvas if window resizes
+		$('window').on('resize', function() {
+			self.prepareCanvas();
+		});
 		self.prepareCanvas();
 		
 		// Listen to changes in the socket and draw the new position
@@ -12498,23 +12666,29 @@ var ThumbKiss = function(config) {
 		});	
 
 		// Start pushing coordinates to the server while the mouse is being clicked
-		document.addEventListener('mousedown', function(event) {
+		self.$canvas.on('mousedown touchstart', function(event) {
+			event.preventDefault();
 			self.start();
 		});
 		
 		// Stop pushing when the mouse is no longer being clicked
-		document.addEventListener('mouseup', function(event) {
+		self.$canvas.on('mouseup touchend', function(event) {
+			event.preventDefault();
 			self.stop();
 		});
 		
-		// Redraw canvas every 10 seconds
+		// Redraw canvas every x milliseconds
 		setInterval(function() {
 			self.redrawCanvas();
 		}, self.config.interval);		
 		
 		// Update coordiantes while the mouse is moving
-		document.addEventListener('mousemove', function(event) {
-			if(event.which === 1) {
+		self.$canvas.on('mousemove touchmove', function(event) {			
+			event.preventDefault();
+			if(event.type === 'touchmove') {
+				self.updateCoordinatesWithTouch(event);
+			}
+			else if(event.which === 1) {
 				self.updateCoordinates(event);
 			}
 			else {

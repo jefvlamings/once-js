@@ -21,7 +21,7 @@ CanvasRenderingContext2D.prototype.clear =
 $('document').ready(function() {
 	var thumbKiss = new ThumbKiss({
 		interval : 1,	
-		points : 50,
+		points : 40,
 		hue: 300,
 		dotSize: 4
 	});
