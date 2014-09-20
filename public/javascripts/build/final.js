@@ -12423,7 +12423,7 @@ var ThumbKiss = function(config) {
 	/**
 	 * Holds the socket connection
 	 */
-	self.socket = io('ws://192.168.0.226:6969');
+	self.socket = io.connect('192.168.0.226:6969');
 	
 	/**
 	 * Holds the canvas
