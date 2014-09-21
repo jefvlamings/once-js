@@ -118,8 +118,8 @@ var ThumbKiss = function(config) {
 	 */
 	self.updateCoordinates = function(event) {
 		self.coordinates = {
-			x: (event.pageX / $(window).width()).toFixed(4),
-			y: (event.pageY / $(window).height()).toFixed(4)
+			x: parseFloat((event.pageX / $(window).width()).toFixed(6)),
+			y: parseFloat((event.pageY / $(window).height()).toFixed(6))
 		};
 	};	
 	
@@ -130,8 +130,8 @@ var ThumbKiss = function(config) {
 	 */
 	self.updateCoordinatesWithTouch = function(event) {
 		self.coordinates = {
-			x: (event.originalEvent.touches[0].pageX / $(window).width()).toFixed(4),
-			y: (event.originalEvent.touches[0].pageY / $(window).height()).toFixed(4)
+			x: parseFloat((event.originalEvent.touches[0].pageX / $(window).width()).toFixed(6)),
+			y: parseFloat((event.originalEvent.touches[0].pageY / $(window).height()).toFixed(6))
 		};
 	};	
 	
@@ -139,7 +139,8 @@ var ThumbKiss = function(config) {
 	 * Pushes the mouse position to the server
 	 */
 	self.push = function() {
-		self.socket.emit('mouse', self.coordinates);
+		console.log(self.coordinates);
+		self.socket.emit('mouse1', self.coordinates);
 	};	
 	
 	/**
@@ -264,7 +265,7 @@ var ThumbKiss = function(config) {
 		self.prepareCanvas();
 		
 		// Listen to changes in the socket and draw the new position
-		self.socket.on('mouse', function(msg){
+		self.socket.on('mouse2', function(msg){
 			self.addPoint(msg);
 		});	
 

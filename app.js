@@ -61,8 +61,11 @@ var http = require('http').Server(app);
 var io = require('socket.io')(http);
 
 io.on('connection', function(socket){
-  socket.on('mouse', function(msg){
-    io.emit('mouse', msg);
+  socket.on('mouse1', function(msg){
+    io.emit('mouse1', msg);
+  });  
+  socket.on('mouse2', function(msg){
+    io.emit('mouse2', msg);
   });
 });
 
