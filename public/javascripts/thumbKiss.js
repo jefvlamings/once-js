@@ -139,7 +139,6 @@ var ThumbKiss = function(config) {
 	 * Pushes the mouse position to the server
 	 */
 	self.push = function() {
-		console.log(self.coordinates);
 		self.socket.emit('mouse1', self.coordinates);
 	};	
 	
@@ -266,6 +265,11 @@ var ThumbKiss = function(config) {
 		
 		// Listen to changes in the socket and draw the new position
 		self.socket.on('mouse2', function(msg){
+			self.addPoint(msg);
+		});	
+		
+		// Listen to changes in the socket and draw the new position
+		self.socket.on('mouse1', function(msg){
 			self.addPoint(msg);
 		});	
 
